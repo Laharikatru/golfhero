@@ -32,11 +32,26 @@ export default function ScoresPage() {
     const s = parseInt(newScore)
     if (isNaN(s) || s < 1 || s > 45) { setError('Score must be between 1 and 45'); return }
     if (!newDate) { setError('Please select a date'); return }
+    
+    // Check duplicate date on frontend
+    const dateExists = scores.some(sc => sc.score_date === newDate)
+    if (dateExists) { setError('You already have a score for this date. Edit or delete it first.'); return }
+    
     setSaving(true)
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
+    
+    // If already 5 scores, delete oldest first
+    if (scores.length >= 5) {
+      const oldest = scores[scores.length - 1]
+      await supabase.from('golf_scores').delete().eq('id', oldest.id)
+    }
+    
     const { error: err } = await supabase.from('golf_scores').insert({ user_id: user!.id, score: s, score_date: newDate, notes: newNotes || null })
-    if (err) { setError(err.message); setSaving(false); return }
+    if (err) { 
+      setError(err.code === '23505' ? 'You already have a score for this date.' : err.message)
+      setSaving(false); return 
+    }
     setNewScore(''); setNewDate(new Date().toISOString().split('T')[0]); setNewNotes(''); setAdding(false)
     setSaving(false)
     load()

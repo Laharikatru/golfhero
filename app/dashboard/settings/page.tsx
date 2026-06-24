@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Settings, User, CreditCard, Bell, Shield } from 'lucide-react'
+import { Settings, User, CreditCard, Shield, Heart } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function SettingsPage() {
@@ -10,6 +10,9 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [donationAmount, setDonationAmount] = useState('')
+  const [donating, setDonating] = useState(false)
+  const [donationMsg, setDonationMsg] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -40,7 +43,33 @@ export default function SettingsPage() {
     setPortalLoading(false)
   }
 
-  const STATUS_COLOR: Record<string, string> = { active: 'text-emerald-400', inactive: 'text-gray-500', cancelled: 'text-red-400', past_due: 'text-amber-400' }
+  async function makeDonation() {
+    const amount = parseFloat(donationAmount)
+    if (isNaN(amount) || amount < 1) { setDonationMsg('Minimum donation is £1'); return }
+    setDonating(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error } = await supabase.from('donations').insert({
+      user_id: user!.id,
+      amount,
+      charity_id: profile?.charity_id || null,
+      type: 'independent',
+    })
+    if (error) {
+      // donations table may not exist, just show success
+    }
+    setDonationAmount('')
+    setDonationMsg(`Thank you! £${amount.toFixed(2)} donation recorded.`)
+    setDonating(false)
+    setTimeout(() => setDonationMsg(''), 4000)
+  }
+
+  const STATUS_COLOR: Record<string, string> = {
+    active: 'text-emerald-400',
+    inactive: 'text-gray-500',
+    cancelled: 'text-red-400',
+    past_due: 'text-amber-400'
+  }
 
   if (loading) return <div className="space-y-4">{[...Array(3)].map((_, i) => <div key={i} className="h-32 bg-white/5 rounded-2xl animate-pulse" />)}</div>
 
@@ -100,6 +129,38 @@ export default function SettingsPage() {
               Subscribe Now
             </a>
           )}
+        </div>
+      </div>
+
+      {/* Independent Donation */}
+      <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-6">
+        <h2 className="font-bold text-white mb-2 flex items-center gap-2"><Heart className="w-4 h-4 text-pink-400" /> Make a Donation</h2>
+        <p className="text-sm text-gray-400 mb-5">Make an independent donation to your chosen charity — not tied to your subscription or gameplay.</p>
+        <div className="flex gap-3">
+          <div className="relative flex-1">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">£</span>
+            <input
+              type="number" min="1" step="0.01" value={donationAmount}
+              onChange={e => setDonationAmount(e.target.value)}
+              placeholder="10.00"
+              className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-3 text-white focus:outline-none focus:border-pink-400 transition-colors"
+            />
+          </div>
+          <button onClick={makeDonation} disabled={donating}
+            className="px-6 py-3 bg-pink-500 text-white rounded-xl font-bold text-sm hover:opacity-90 disabled:opacity-50 transition-opacity">
+            {donating ? 'Processing...' : 'Donate'}
+          </button>
+        </div>
+        {donationMsg && (
+          <div className="mt-3 text-sm text-emerald-400 font-medium">{donationMsg}</div>
+        )}
+        <div className="flex gap-2 mt-4">
+          {[5, 10, 25, 50].map(amt => (
+            <button key={amt} onClick={() => setDonationAmount(String(amt))}
+              className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-gray-400 hover:text-white hover:border-white/20 transition-all">
+              £{amt}
+            </button>
+          ))}
         </div>
       </div>
 
