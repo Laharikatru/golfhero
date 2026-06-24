@@ -1,15 +1,14 @@
 'use client'
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Trophy, Eye, EyeOff, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const defaultPlan = searchParams.get('plan') || 'monthly'
-  const [step, setStep] = useState(1)
   const [plan, setPlan] = useState(defaultPlan)
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -28,7 +27,6 @@ export default function SignupPage() {
       options: { data: { full_name: fullName } }
     })
     if (error) { setError(error.message); setLoading(false); return }
-    // Redirect to subscription checkout
     const res = await fetch('/api/subscription/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -53,7 +51,6 @@ export default function SignupPage() {
           <p className="text-gray-400">Join thousands of golfers making a difference</p>
         </div>
 
-        {/* Plan Selection */}
         <div className="grid grid-cols-2 gap-4 mb-6">
           {[
             { id: 'monthly', name: 'Monthly', price: '£9.99/mo', sub: 'Billed monthly' },
@@ -107,4 +104,8 @@ export default function SignupPage() {
       </div>
     </div>
   )
+}
+
+export default function SignupPage() {
+  return <Suspense><SignupForm /></Suspense>
 }

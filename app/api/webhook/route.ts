@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { countMatches } from '@/lib/draw-engine'
+
+function countMatches(scores: number[], drawn: number[]): number {
+  return scores.filter(s => drawn.includes(s)).length
+}
 
 export async function POST(request: NextRequest) {
   try {

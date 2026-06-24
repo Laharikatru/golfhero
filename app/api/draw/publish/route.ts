@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { countMatches } from '@/lib/draw-engine'
+
+function countMatches(scores: number[], drawn: number[]): number {
+  return scores.filter(s => drawn.includes(s)).length
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +16,6 @@ export async function POST(request: NextRequest) {
 
     const { numbers, month, year, drawType, total_pool, pool_5match, pool_4match, pool_3match, participant_count } = await request.json()
 
-    // Upsert draw
     const { data: draw, error: drawError } = await supabase.from('draws').upsert({
       draw_month: month, draw_year: year, draw_type: drawType, status: 'published',
       number_1: numbers[0], number_2: numbers[1], number_3: numbers[2], number_4: numbers[3], number_5: numbers[4],
@@ -22,7 +24,6 @@ export async function POST(request: NextRequest) {
 
     if (drawError) throw drawError
 
-    // Get all active subscriber scores
     const { data: activeUsers } = await supabase.from('profiles').select('id').eq('subscription_status', 'active')
     const userIds = activeUsers?.map((u: any) => u.id) || []
 
@@ -34,7 +35,6 @@ export async function POST(request: NextRequest) {
         userScoreMap.get(s.user_id)!.push(s.score)
       })
 
-      // Count winners per tier for prize splitting
       let count5 = 0, count4 = 0, count3 = 0
       userScoreMap.forEach(scores => {
         const m = countMatches(scores, numbers)
@@ -43,7 +43,6 @@ export async function POST(request: NextRequest) {
         else if (m === 3) count3++
       })
 
-      // Insert draw results
       const results = []
       for (const [userId, scores] of userScoreMap) {
         const matched = scores.filter(s => numbers.includes(s))
@@ -57,17 +56,12 @@ export async function POST(request: NextRequest) {
           draw_id: draw.id, user_id: userId, user_scores: scores,
           match_count: matchCount, matched_numbers: matched,
           prize_amount: Number(prizeAmount.toFixed(2)),
-          payment_status: prizeAmount > 0 ? 'pending' : 'pending',
+          payment_status: 'pending',
         })
       }
 
       if (results.length > 0) {
         await supabase.from('draw_results').upsert(results, { onConflict: 'draw_id,user_id' })
-        // Update total_winnings for winners
-        const winners = results.filter(r => r.prize_amount > 0)
-        for (const w of winners) {
-          await supabase.rpc('increment_winnings', { user_id: w.user_id, amount: w.prize_amount }).catch(() => {})
-        }
       }
     }
 
